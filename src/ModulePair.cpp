@@ -1,6 +1,8 @@
 #include "VZemu.hpp"
 #include "Waves.hpp"
 
+#include <cmath>
+
 using namespace rack;
 
 // VCV has a limit of 16 channels in a polyphonic cable.
@@ -46,14 +48,15 @@ struct ModulePair : Module
         NUM_LIGHTS
     };
 
-    float phase = 0;
+    float phase1 = 0;
+    float phase2 = 0;
 
     ModulePair()
     {
         config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, NUM_LIGHTS);
-        configSwitch(WAVEFORM1_PARAM, 1, 8, 1, "Waveform odd", {"Sine", "Saw1", "Saw2", "Saw3", "Saw4", "Saw5", "Noise1", "Noise2"});
+        configSwitch(WAVEFORM1_PARAM, 0, 7, 0, "Waveform odd", {"Sine", "Saw1", "Saw2", "Saw3", "Saw4", "Saw5", "Noise1", "Noise2"});
         paramQuantities[WAVEFORM1_PARAM]->snapEnabled = true;
-        configSwitch(WAVEFORM2_PARAM, 1, 8, 1, "Waveform even", {"Sine", "Saw1", "Saw2", "Saw3", "Saw4", "Saw5", "Noise1", "Noise2"});
+        configSwitch(WAVEFORM2_PARAM, 0, 7, 0, "Waveform even", {"Sine", "Saw1", "Saw2", "Saw3", "Saw4", "Saw5", "Noise1", "Noise2"});
         paramQuantities[WAVEFORM2_PARAM]->snapEnabled = true;
         configSwitch(MIX_PARAM, 0, 1, 0, "Mode", {"Mix", "Ring"});
         paramQuantities[MIX_PARAM]->snapEnabled = true;
@@ -82,23 +85,47 @@ struct ModulePair : Module
         lights[INTERNAL_PHASE_LIGHT].setBrightness(intPhase);
         bool vcoMode = !intPhase && !inputs[EXT_PHASE_INPUT].isConnected();
         lights[VCO_MODE_LIGHT].setBrightness(vcoMode);
-        bool ring = vcoMode && params[MIX_PARAM].getValue() > 0.f;
-        lights[RING_LIGHT].setBrightness(ring);
-
-        float cv = inputs[PITCH1_INPUT].getVoltage();
-
-        float pitch = cv + float(std::log2(261.626));
-        float freq = std::pow(2.f, pitch);
-
-        const float normalizedFreq = args.sampleTime * freq;
-        // phaseAdvance[i] = normalizedFreq;
-
-        phase += normalizedFreq;
-        if(phase > 1.f) phase -= 1.f;
+        bool ringLight = vcoMode && params[MIX_PARAM].getValue() > 0.f;
+        lights[RING_LIGHT].setBrightness(ringLight);
 
         outputs[WAVE_OUTPUT].setChannels(1);
-        float value = waves.get_Value(phase);
-        outputs[WAVE_OUTPUT].setVoltage(value * 5);
+
+        float cv1 = inputs[PITCH1_INPUT].getVoltage();
+        float amp1 = params[VOLUME1_PARAM].getValue();
+        float amp2 = params[VOLUME2_PARAM].getValue();
+
+        int waveform1 = params[WAVEFORM1_PARAM].getValue();
+        int waveform2 = params[WAVEFORM2_PARAM].getValue();
+
+        bool phaseMod = params[PHASE_PARAM].getValue() != 0;
+        phase1 += args.sampleTime * std::pow(2.f, cv1 + float(std::log2(261.626)));
+        if (phase1 > 1.f)
+            phase1 -= 1.f;
+        float w1 = waves.get_Value(waveform1, phase1);
+        float value;
+        if (phaseMod)
+        {
+            float wave1 = 1.f * w1 * (amp1 / 100.f + .5f / 2 / M_PI);
+            float phase = wave1 - std::floor(wave1);
+            float w2 = waves.get_Value(waveform2, phase);
+            value = w2 * amp2 / 20;
+        }
+        else
+        {
+            float cv2 = inputs[PITCH2_INPUT].getVoltage();
+            bool ring = params[MIX_PARAM].getValue() != 0;
+
+            // phaseAdvance[i] = normalizedFreq;
+
+            phase2 += args.sampleTime * std::pow(2.f, cv2 + float(std::log2(261.626)));
+            if (phase2 > 1.f)
+                phase2 -= 1.f;
+
+            float w2 = waves.get_Value(waveform2, phase2);
+            value = ring ? w1 * amp1 * (1 + w2 * amp2 / 100) / 20
+                         : (w1 * amp1 + w2 * amp2) / 20.f;
+        }
+        outputs[WAVE_OUTPUT].setVoltage(value);
     }
 };
 
@@ -114,14 +141,14 @@ struct ModulePairWidget : ModuleWidget
         addChild(createWidget<ScrewSilver>(Vec(15, 365)));
         addChild(createWidget<ScrewSilver>(Vec(box.size.x - 30, 365)));
 
-        Knob *wave1 = createParamCentered<Trimpot>(Vec(20,63), module, ModulePair::WAVEFORM1_PARAM);
+        Knob *wave1 = createParamCentered<Trimpot>(Vec(20, 63), module, ModulePair::WAVEFORM1_PARAM);
         wave1->minAngle = -.7 * M_PI;
         wave1->maxAngle = .7 * M_PI;
         addParam(wave1);
 
         addParam(createParamCentered<RoundSmallBlackKnob>(Vec(56, 74), module, ModulePair::VOLUME1_PARAM));
 
-        Knob *wave2 = createParamCentered<Trimpot>(Vec(20,172), module, ModulePair::WAVEFORM2_PARAM);
+        Knob *wave2 = createParamCentered<Trimpot>(Vec(20, 172), module, ModulePair::WAVEFORM2_PARAM);
         wave2->minAngle = -.7 * M_PI;
         wave2->maxAngle = .7 * M_PI;
         addParam(wave2);
