@@ -1,0 +1,26 @@
+{
+  "slug": "VZemu",
+  "name": "VZemu",
+  "version": "2.0.0",
+  "license": "GPL-3.0-or-later",
+  "brand": "VZemu",
+  "author": "Christoph Borgmeier",
+  "authorEmail": "github@borgmeier.org",
+  "authorUrl": "",
+  "pluginUrl": "",
+  "manualUrl": "",
+  "sourceUrl": "",
+  "donateUrl": "",
+  "changelogUrl": "",
+  "modules": [
+    {
+      "slug": "VZemu-ModulePair",
+      "name": "VZ-U Module Pair",
+      "description": "VZ-VCO",
+      "tags": [
+        "VCO",
+        "Polyphonic"
+      ]
+    }
+  ]
+}
