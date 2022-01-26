@@ -48,8 +48,8 @@ struct ModulePair : Module
         NUM_LIGHTS
     };
 
-    float phase1 = 0;
-    float phase2 = 0;
+    float phase1[maxPolyphony] = {0};
+    float phase2[maxPolyphony] = {0};
 
     ModulePair()
     {
@@ -88,44 +88,51 @@ struct ModulePair : Module
         bool ringLight = vcoMode && params[MIX_PARAM].getValue() > 0.f;
         lights[RING_LIGHT].setBrightness(ringLight);
 
-        outputs[WAVE_OUTPUT].setChannels(1);
+        int currentPolyphony = std::max(1, std::max(inputs[PITCH1_INPUT].getChannels(), inputs[PITCH2_INPUT].getChannels()));
+        outputs[WAVE_OUTPUT].setChannels(currentPolyphony);
 
-        float cv1 = inputs[PITCH1_INPUT].getVoltage();
-        float amp1 = params[VOLUME1_PARAM].getValue();
-        float amp2 = params[VOLUME2_PARAM].getValue();
+        float ampParameter1 = params[VOLUME1_PARAM].getValue();
+        float ampParameter2 = params[VOLUME2_PARAM].getValue();
 
         int waveform1 = params[WAVEFORM1_PARAM].getValue();
         int waveform2 = params[WAVEFORM2_PARAM].getValue();
 
         bool phaseMod = params[PHASE_PARAM].getValue() != 0;
-        phase1 += args.sampleTime * std::pow(2.f, cv1 + float(std::log2(261.626)));
-        if (phase1 > 1.f)
-            phase1 -= 1.f;
-        float w1 = waves.get_Value(waveform1, phase1);
-        float value;
-        if (phaseMod)
+        bool ring = params[MIX_PARAM].getValue() != 0;
+
+        for (int i = 0; i < currentPolyphony; ++i)
         {
-            float wave1 = 1.f * w1 * (amp1 / 100.f + .5f / 2 / M_PI);
-            float phase = wave1 - std::floor(wave1);
-            float w2 = waves.get_Value(waveform2, phase);
-            value = w2 * amp2 / 20;
+            float cv1 = inputs[PITCH1_INPUT].getChannels() > i ? inputs[PITCH1_INPUT].getVoltage(i) : 0;
+
+            float amp1 = ampParameter1 / 100.f * inputs[VOLUME1_INPUT].getVoltage(i) / 10.f;
+            float amp2 = ampParameter2 / 100.f * inputs[VOLUME2_INPUT].getVoltage(i) / 10.f;
+
+            phase1[i] += args.sampleTime * std::pow(2.f, cv1 + float(std::log2(261.626)));
+            if (phase1[i] > 1.f)
+                phase1[i] -= 1.f;
+            float w1 = waves.get_Value(waveform1, phase1[i]);
+            float value;
+            if (phaseMod)
+            {
+                float wave1 = 1.f * w1 * (amp1 + .5f / 2 / M_PI);
+                float phase = wave1 - std::floor(wave1);
+                float w2 = waves.get_Value(waveform2, phase);
+                value = w2 * amp2 * 5.f;
+            }
+            else
+            {
+                float cv2 = inputs[PITCH2_INPUT].getVoltage(i);
+
+                phase2[i] += args.sampleTime * std::pow(2.f, cv2 + float(std::log2(261.626)));
+                if (phase2[i] > 1.f)
+                    phase2[i] -= 1.f;
+
+                float w2 = waves.get_Value(waveform2, phase2[i]);
+                value = ring ? w1 * amp1 * (1 + w2 * amp2 ) *5.f
+                             : (w1 * amp1 + w2 * amp2) *5.f;
+            }
+            outputs[WAVE_OUTPUT].setVoltage(value, i);
         }
-        else
-        {
-            float cv2 = inputs[PITCH2_INPUT].getVoltage();
-            bool ring = params[MIX_PARAM].getValue() != 0;
-
-            // phaseAdvance[i] = normalizedFreq;
-
-            phase2 += args.sampleTime * std::pow(2.f, cv2 + float(std::log2(261.626)));
-            if (phase2 > 1.f)
-                phase2 -= 1.f;
-
-            float w2 = waves.get_Value(waveform2, phase2);
-            value = ring ? w1 * amp1 * (1 + w2 * amp2 / 100) / 20
-                         : (w1 * amp1 + w2 * amp2) / 20.f;
-        }
-        outputs[WAVE_OUTPUT].setVoltage(value);
     }
 };
 
