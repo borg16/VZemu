@@ -1,8 +1,19 @@
 #pragma once
-#include <rack.hpp>
 
-// Declare the Plugin, defined in plugin.cpp
-extern rack::Plugin* pluginInstance;
+namespace rack
+{
+    namespace plugin
+    {
+        struct Plugin;
+        struct Model;
+    }
+}
 
-// Declare each Model, defined in each module source file
-extern rack::Model* modelModulePair;
+namespace VZemu
+{
+    extern rack::plugin::Plugin *pluginInstance;
+
+    extern rack::plugin::Model *modelModulePair;
+
+    extern rack::plugin::Model *modelEnvelope;
+}
