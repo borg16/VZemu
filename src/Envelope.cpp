@@ -37,7 +37,7 @@ namespace VZemu
         enum LightIds
         {
             END1_LIGHT,
-            END_END_LIGHT = END1_LIGHT + MAX_STEPS,
+            END_END_LIGHT = END1_LIGHT + MAX_STEPS * 2,
             SUSTAINSTEP1_LIGHT = END_END_LIGHT,
             SUSTAINSTEP_END_LIGHT = SUSTAINSTEP1_LIGHT + MAX_STEPS,
             NUM_LIGHTS = SUSTAINSTEP_END_LIGHT
@@ -75,7 +75,8 @@ namespace VZemu
             bool newSustainDown = false;
             for (size_t i = 0; i < MAX_STEPS; ++i)
             {
-                lights[END1_LIGHT + i].setBrightness(numSteps == int(i + 1));
+                lights[END1_LIGHT + 2 * i + 1].setBrightness(numSteps == int(i + 1));
+
                 if (params[SUSTAINSTEP1_PARAM + i].getValue())
                 {
                     if (!anySustainDown)
@@ -93,6 +94,8 @@ namespace VZemu
 
             if (loaded && inputs[TRIGGER_INPUT].getVoltage() > 0.2)
             {
+                lights[END1_LIGHT].setBrightness(1);
+                lights[END1_LIGHT + 2 * currentStep].setBrightness(0);
                 currentStep = 0;
                 stepPhase = 0;
                 loaded = false;
@@ -106,19 +109,28 @@ namespace VZemu
                 stepPhase += args.sampleTime;
                 float stepLength = 10. / (params[RATE1_PARAM + currentStep].getValue() + 1);
 
-                if (stepPhase >= stepLength)
+                if (loaded || currentStep + 1 != currentSustainStep)
                 {
-                    stepPhase = 0;
-                    ++currentStep;
-                    if (currentStep >= params[NUMSTEPS_PARAM].getValue())
+                    if (stepPhase >= stepLength)
                     {
-                        currentStep = -1;
-                        currentOutput = 0;
-                    }
-                }
 
-                float advance = (params[LEVEL1_PARAM + currentStep].getValue() / 10 - currentOutput) / (stepLength - stepPhase) * args.sampleTime;
-                currentOutput += advance;
+                        lights[END1_LIGHT + 2 * currentStep].setBrightness(0);
+                        stepPhase = 0;
+                        ++currentStep;
+                        if (currentStep >= params[NUMSTEPS_PARAM].getValue())
+                        {
+                            currentStep = -1;
+                            currentOutput = 0;
+                        }
+                        else
+                        {
+                            lights[END1_LIGHT + 2 * currentStep].setBrightness(1);
+                        }
+                    }
+
+                    float advance = (params[LEVEL1_PARAM + currentStep].getValue() / 10 - currentOutput) / (stepLength - stepPhase) * args.sampleTime;
+                    currentOutput += advance;
+                }
             }
 
             outputs[ENVELOPE_OUTPUT].setChannels(1);
@@ -142,7 +154,7 @@ namespace VZemu
 
             for (size_t i = 0; i < Envelope::MAX_STEPS; ++i)
             {
-                addChild(createLightCentered<SmallSimpleLight<RedLight>>(mm2px(Vec(2.2, 21.2 + i * 10.5)), module, Envelope::END1_LIGHT + i));
+                addChild(createLightCentered<SmallSimpleLight<GreenRedLight>>(mm2px(Vec(2.2, 21.2 + i * 10.5)), module, Envelope::END1_LIGHT + 2 * i));
                 addChild(createLightParamCentered<VCVLightButton<SmallSimpleLight<GreenLight>>>(mm2px(Vec(21.7, 22.6 + i * 10.5)), module, Envelope::SUSTAINSTEP1_PARAM + i, Envelope::SUSTAINSTEP1_LIGHT + i));
                 addParam(createParamCentered<Trimpot>(mm2px(Vec(6.7, 25.0 + i * 10.5)), module, Envelope::RATE1_PARAM + i));
                 addParam(createParamCentered<Trimpot>(mm2px(Vec(15.0, 25.0 + i * 10.5)), module, Envelope::LEVEL1_PARAM + i));

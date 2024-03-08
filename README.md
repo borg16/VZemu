@@ -1,5 +1,5 @@
 # VZemu
-VCV Rack synthesizer modules emulating aspects of an 80s electronical instrument  
+[VCV Rack](https://vcvrack.com/) synthesizer modules emulating aspects of an 80s electronical instrument  
 
 **Draft**: Not much to see yet.
 
