@@ -5,3 +5,5 @@
 /plugin.dll
 .DS_Store
 .vscode/c_cpp_properties.json
+*.o
+/test/*.exe

@@ -4,14 +4,35 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "make install",
+            "label": "Build Tests",
             "type": "shell",
-            "command": "make install",
-            "problemMatcher": [],
+            "command": "cmake",
+            "args": [
+                "--build",
+                "build",
+                "--target",
+                "test_Envelope",
+                "--config",
+                "Debug"
+            ],
             "group": {
                 "kind": "build",
                 "isDefault": true
-            }
+            },
+            "problemMatcher": ["$msCompile"]
+        },
+        {
+            "label": "Configure CMake",
+            "type": "shell",
+            "command": "cmake",
+            "args": [
+                "-B",
+                "build",
+                "-S",
+                ".",
+                "-DCMAKE_BUILD_TYPE=Debug"
+            ],
+            "problemMatcher": []
         }
     ]
 }
