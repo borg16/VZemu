@@ -52,5 +52,13 @@ namespace VZemu
 
         Envelope();
         void process(const ProcessArgs &args) override;
+
+    private:
+        void updateSustainControls(int numSteps);
+        void updateStepIndicatorLights(int numSteps);
+        bool handleTrigger();
+        void processEnvelopeStep(const ProcessArgs &args, int numSteps);
+        void advanceToNextStep(int numSteps);
+        void updateOutput(bool holdingSustain, float targetLevel, float stepLength);
     };
 }

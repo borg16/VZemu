@@ -33,28 +33,64 @@ namespace VZemu
     void Envelope::process(const ProcessArgs &args)
     {
         int numSteps = params[NUMSTEPS_PARAM].getValue();
+        
+        // Update sustain button states and lights
+        updateSustainControls(numSteps);
+        
+        // Update number of steps indicator lights
+        updateStepIndicatorLights(numSteps);
+        
+        // Handle trigger input
+        if (handleTrigger())
+        {
+            return; // Skip step processing on the same frame as trigger detection
+        }
+        
+        // Process envelope step if active
+        if (currentStep >= 0)
+        {
+            processEnvelopeStep(args, numSteps);
+        }
+
+        // Output the current envelope value
+        outputs[ENVELOPE_OUTPUT].setChannels(1);
+        outputs[ENVELOPE_OUTPUT].setVoltage(currentOutput);
+    }
+
+    void Envelope::updateSustainControls(int numSteps)
+    {
         bool newSustainDown = false;
         for (size_t i = 0; i < MAX_STEPS; ++i)
         {
-            lights[END1_LIGHT + 2 * i + 1].setBrightness(numSteps == int(i + 1));
-
             if (params[SUSTAINSTEP1_PARAM + i].getValue())
             {
                 if (!anySustainDown)
                     currentSustainStep = (currentSustainStep == int(i + 1)) ? 0 : i + 1;
                 newSustainDown = true;
             }
-        }
-        anySustainDown = newSustainDown;
-
-        float dimSustain = currentSustainStep > numSteps ? .3 : 1;
-        for (size_t i = 0; i < MAX_STEPS; ++i)
-        {
+            
+            // Update sustain lights
+            float dimSustain = currentSustainStep > numSteps ? 0.3f : 1.0f;
             lights[SUSTAINSTEP1_LIGHT + i].setBrightness(dimSustain * (currentSustainStep == int(i + 1)));
         }
+        anySustainDown = newSustainDown;
+    }
 
-        if (!triggering && inputs[TRIGGER_INPUT].getVoltage() > 0.2)
+    void Envelope::updateStepIndicatorLights(int numSteps)
+    {
+        for (size_t i = 0; i < MAX_STEPS; ++i)
         {
+            lights[END1_LIGHT + 2 * i + 1].setBrightness(numSteps == int(i + 1));
+        }
+    }
+
+    bool Envelope::handleTrigger()
+    {
+        bool triggerHigh = inputs[TRIGGER_INPUT].getVoltage() > 0.2f;
+        
+        if (!triggering && triggerHigh)
+        {
+            // Trigger detected - start new envelope
             lights[END1_LIGHT].setBrightness(1);
             if (currentStep > 0)
             {
@@ -63,88 +99,86 @@ namespace VZemu
             currentStep = 0;
             stepPhase = 0;
             triggering = true;
-            // Don't process step on the same call where trigger is detected
+            return true; // Signal to skip step processing this frame
         }
-        else if (triggering && inputs[TRIGGER_INPUT].getVoltage() < 0.2)
+        else if (triggering && !triggerHigh)
         {
+            // Trigger released
             triggering = false;
         }
-        else if (currentStep >= 0)
+        
+        return false;
+    }
+
+    void Envelope::processEnvelopeStep(const ProcessArgs &args, int numSteps)
+    {
+        stepPhase += args.sampleTime;
+        float stepLength = 10.0f / (params[RATE1_PARAM + currentStep].getValue() + 1.0f);
+        float targetLevel = params[LEVEL1_PARAM + currentStep].getValue() / 10.0f;
+
+        // Check if we're holding at sustain point with target reached
+        bool atSustainStep = (currentStep + 1 == currentSustainStep);
+        bool reachedTarget = std::abs(currentOutput - targetLevel) < 0.01f;
+        bool holdingSustain = (atSustainStep && triggering && reachedTarget);
+
+        // Advance to next step when time elapsed, unless holding at sustain
+        bool shouldAdvance = (stepPhase >= stepLength) && !holdingSustain;
+        
+        if (shouldAdvance)
         {
-            stepPhase += args.sampleTime;
-            float stepLength = 10. / (params[RATE1_PARAM + currentStep].getValue() + 1);
-            float targetLevel = params[LEVEL1_PARAM + currentStep].getValue() / 10.0f;
-
-            // Check if we're at the sustain step and trigger is held
-            bool atSustainAndHeld = (triggering && currentStep + 1 == currentSustainStep);
-            
-            // Check if we've reached the target level
-            bool reachedTarget = std::abs(currentOutput - targetLevel) < 0.01f;
-
-            // Check if we should advance to next step:
-            // - Advance if trigger is released (triggering == false)
-            // - OR if not at the sustain step
-            // - AND step duration has elapsed
-            // - OR if at sustain and target reached
-            bool shouldAdvance = false;
-            if (atSustainAndHeld && reachedTarget)
-            {
-                // At sustain step, target reached, and trigger held: don't advance
-                shouldAdvance = false;
-            }
-            else if (!triggering || currentStep + 1 != currentSustainStep)
-            {
-                // Normal step progression when not at sustain or trigger released
-                shouldAdvance = stepPhase >= stepLength;
-            }
-            
-            if (shouldAdvance)
-            {
-                lights[END1_LIGHT + 2 * currentStep].setBrightness(0);
-                stepPhase = 0;
-                ++currentStep;
-                if (currentStep >= params[NUMSTEPS_PARAM].getValue())
-                {
-                    currentStep = -1;
-                    currentOutput = 0.0f;
-                }
-                else
-                {
-                    lights[END1_LIGHT + 2 * currentStep].setBrightness(1);
-                }
-            }
-
-            // Interpolate output towards target, but only if not holding at sustain
-            if (currentStep >= 0)
-            {
-                if (atSustainAndHeld && reachedTarget)
-                {
-                    // Hold at target level during sustain
-                    currentOutput = targetLevel;
-                }
-                else
-                {
-                    // Interpolate towards target using linear interpolation over the step duration
-                    // Calculate how far through the step we are (0 to 1)
-                    float stepProgress = stepPhase / stepLength;
-                    
-                    // Get the starting level (previous step's target or 0 if first step)
-                    float startLevel = 0.0f;
-                    if (currentStep > 0) {
-                        startLevel = params[LEVEL1_PARAM + currentStep - 1].getValue() / 10.0f;
-                    }
-                    
-                    // Linear interpolation from start to target based on progress
-                    currentOutput = startLevel + (targetLevel - startLevel) * stepProgress;
-                }
-                
-                // Clamp output to valid range [0, 10V]
-                currentOutput = clamp(currentOutput, 0.0f, 10.0f);
-            }
+            advanceToNextStep(numSteps);
         }
 
-        outputs[ENVELOPE_OUTPUT].setChannels(1);
-        outputs[ENVELOPE_OUTPUT].setVoltage(currentOutput);
+        // Update output voltage
+        if (currentStep >= 0)
+        {
+            updateOutput(holdingSustain, targetLevel, stepLength);
+        }
+    }
+
+    void Envelope::advanceToNextStep(int numSteps)
+    {
+        lights[END1_LIGHT + 2 * currentStep].setBrightness(0);
+        stepPhase = 0;
+        ++currentStep;
+        
+        if (currentStep >= numSteps)
+        {
+            // Envelope complete
+            currentStep = -1;
+            currentOutput = 0.0f;
+        }
+        else
+        {
+            // Light up next step indicator
+            lights[END1_LIGHT + 2 * currentStep].setBrightness(1);
+        }
+    }
+
+    void Envelope::updateOutput(bool holdingSustain, float targetLevel, float stepLength)
+    {
+        if (holdingSustain)
+        {
+            // Hold at target level during sustain
+            currentOutput = targetLevel;
+        }
+        else
+        {
+            // Linear interpolation from start level to target level
+            float stepProgress = stepPhase / stepLength;
+            
+            // Get starting level (previous step's target or 0 if first step)
+            float startLevel = 0.0f;
+            if (currentStep > 0)
+            {
+                startLevel = params[LEVEL1_PARAM + currentStep - 1].getValue() / 10.0f;
+            }
+            
+            currentOutput = startLevel + (targetLevel - startLevel) * stepProgress;
+        }
+        
+        // Clamp output to valid range
+        currentOutput = clamp(currentOutput, 0.0f, 10.0f);
     }
 
 #ifndef ENVELOPE_TEST_BUILD
