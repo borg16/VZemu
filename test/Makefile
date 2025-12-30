@@ -12,20 +12,23 @@ LDFLAGS = -L$(RACK_DIR) -L. -lRack -lgtest -lgtest_main -static-libgcc -static-l
 # Test sources
 TEST_SOURCES = test_Envelope.cpp
 SRC_SOURCES = ../src/Envelope.cpp
-TEST_OBJECTS = $(TEST_SOURCES:.cpp=.o)
-SRC_OBJECTS = $(patsubst ../src/%.cpp,../src/%.o,$(SRC_SOURCES))
-TEST_EXECUTABLE = test_envelope
+TEST_OBJECTS = $(patsubst %.cpp,../build/test/%.o,$(TEST_SOURCES))
+SRC_OBJECTS = $(patsubst ../src/%.cpp,../build/test/%.o,$(SRC_SOURCES))
+TEST_EXECUTABLE = ../build/test/test_envelope
 
 # Build target
 all: $(TEST_EXECUTABLE)
 
 $(TEST_EXECUTABLE): $(TEST_OBJECTS) $(SRC_OBJECTS)
+	@mkdir -p ../build/test
 	$(CXX) $(TEST_OBJECTS) $(SRC_OBJECTS) -o $@ $(LDFLAGS)
 
-../src/%.o: ../src/%.cpp
+../build/test/%.o: ../src/%.cpp
+	@mkdir -p ../build/test
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-%.o: %.cpp
+../build/test/%.o: %.cpp
+	@mkdir -p ../build/test
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # Run tests
