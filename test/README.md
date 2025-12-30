@@ -66,13 +66,18 @@ make
 
 After building, run the tests with:
 ```bash
-make test
+make test               # Run all tests
+make test-envelope      # Run Envelope tests only
+make test-modulepair    # Run ModulePair tests only
 ```
 
-Or run the executable directly:
+Or run the executables directly:
 ```bash
 ./test_envelope       # Linux/macOS
 test_envelope.exe     # Windows
+
+./test_modulepair     # Linux/macOS
+test_modulepair.exe   # Windows
 ```
 
 ## Test Coverage
@@ -96,6 +101,35 @@ Tests for the Envelope module include:
 - **SustainHoldsEnvelope**: Tests that sustain holds the envelope at the specified step
 - **OutputZeroWhenInactive**: Verifies output is zero when envelope is not triggered
 - **LightConfiguration**: Validates all lights are accessible and functional
+
+### ModulePair Module Tests (`test_ModulePair.cpp`)
+
+Tests for the ModulePair module include:
+
+- **InitialState**: Verifies module initializes with zeroed phase arrays
+- **ParameterConfiguration**: Checks all waveform, volume, mix, and phase parameters
+- **IOConfiguration**: Validates inputs, outputs, and lights are configured
+- **LightStatesVCOMode**: Tests VCO mode light indicators
+- **LightStatesInternalPhaseMode**: Verifies internal phase mode light states
+- **LightStatesRingMode**: Tests ring modulation mode light indicators
+- **LightStatesWithExternalPhase**: Validates external phase input affects lights
+- **PolyphonyMonophonic**: Tests single-channel operation
+- **PolyphonyMultiple**: Verifies multi-channel polyphonic processing
+- **PolyphonyNoInputs**: Tests default monophonic behavior with no inputs
+- **PhaseAccumulation**: Verifies phase advances over time
+- **PhaseWrapping**: Tests phase wraps correctly between 0 and 1
+- **WaveformParameterRange**: Validates all waveform types (0-7)
+- **VolumeParameterZero**: Tests zero volume produces silence
+- **VolumeParameterFull**: Verifies full volume produces output
+- **VolumeInputZeroVoltage**: Tests CV input at 0V produces silence
+- **VolumeInputFullVoltage**: Verifies CV input at 10V produces output
+- **MixMode**: Tests additive synthesis mixing mode
+- **RingModMode**: Validates ring modulation behavior
+- **PhaseModMode**: Tests phase modulation synthesis
+- **PitchCVResponse**: Verifies pitch control voltage affects frequency
+- **PolyphonicProcessing**: Tests multiple independent channels
+- **IndependentChannelPhases**: Verifies each channel has independent phase
+- **OutputVoltageRange**: Validates output stays within reasonable audio range
 
 ## Adding New Tests
 
