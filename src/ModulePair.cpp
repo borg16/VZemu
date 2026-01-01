@@ -147,10 +147,10 @@ namespace VZemu
             setModule(module);
             setPanel(APP->window->loadSvg(asset::plugin(pluginInstance, "res/ModulePair_panel.svg")));
 
-            addChild(createWidget<ScrewSilver>(Vec(15, 0)));
-            addChild(createWidget<ScrewSilver>(Vec(box.size.x - 30, 0)));
-            addChild(createWidget<ScrewSilver>(Vec(15, 365)));
-            addChild(createWidget<ScrewSilver>(Vec(box.size.x - 30, 365)));
+            addChild(createWidget<ScrewBlack>(Vec(15, 0)));
+            addChild(createWidget<ScrewBlack>(Vec(box.size.x - 30, 0)));
+            addChild(createWidget<ScrewBlack>(Vec(15, 365)));
+            addChild(createWidget<ScrewBlack>(Vec(box.size.x - 30, 365)));
 
             Knob *wave1 = createParamCentered<Trimpot>(Vec(20, 63), module, ModulePair::WAVEFORM1_PARAM);
             wave1->minAngle = -.7 * M_PI;
